@@ -1,6 +1,10 @@
+import 'package:Chat_App/resources/firebase_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'screens/HomeScreen.dart';
+import 'screens/LoginScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,8 +19,10 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  FirebaseRepository _repository = FirebaseRepository();
   @override
   Widget build(BuildContext context) {
+    //_repository.signOut();              // For signing out
     FirebaseFirestore.instance
         .collection("users")
         .doc()
@@ -24,8 +30,14 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: "Chat App",
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Container(),
+      home: FutureBuilder(
+        future: _repository.getCurrentUser(),
+        builder: (context, AsyncSnapshot<User> snapshot) {
+          if (snapshot.hasData)
+            return HomeScreen();
+          else
+            return LoginScreen();
+        },
       ),
     );
   }
