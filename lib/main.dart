@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'screens/HomeScreen.dart';
 import 'screens/LoginScreen.dart';
+import 'screens/SearchScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,10 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: "Chat App",
       debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/search_screen': (context) => SearchScreen(),
+      },
       home: FutureBuilder(
         future: _repository.getCurrentUser(),
         builder: (context, AsyncSnapshot<User> snapshot) {

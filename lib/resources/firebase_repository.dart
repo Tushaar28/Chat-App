@@ -1,3 +1,4 @@
+import 'package:Chat_App/models/users.dart';
 import 'package:Chat_App/resources/firebase_methods.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -14,4 +15,7 @@ class FirebaseRepository {
   Future<void> addDataToDb(User user) => _firebaseMethods.addDataToDb(user);
 
   Future<void> signOut() => _firebaseMethods.signOut();
+
+  Future<List<Users>> fetchAllUsers(User user) =>
+      _firebaseMethods.fetchAllUsers(user);
 }

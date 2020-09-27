@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../utils/universal_variables.dart';
+import '../screens/pageviews/ChatListScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -35,13 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: UniversalVariables.blackColor,
       body: PageView(
         children: <Widget>[
-          Center(
-            child: Text(
-              "Chats",
-              style: TextStyle(
-                color: Colors.white,
-              ),
-            ),
+          Container(
+            child: ChatListScreen(),
           ),
           Center(
             child: Text(
@@ -112,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : UniversalVariables.greyColor,
                 ),
                 title: Text(
-                  "Chats",
+                  "Search",
                   style: TextStyle(
                     fontSize: _labelFontSize,
                     color: (_page == 2)
