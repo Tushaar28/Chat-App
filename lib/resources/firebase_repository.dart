@@ -1,3 +1,4 @@
+import 'package:Chat_App/models/message.dart';
 import 'package:Chat_App/models/users.dart';
 import 'package:Chat_App/resources/firebase_methods.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,4 +19,7 @@ class FirebaseRepository {
 
   Future<List<Users>> fetchAllUsers(User user) =>
       _firebaseMethods.fetchAllUsers(user);
+
+  Future<void> addMessageToDb(Message message, Users sender, Users receiver) =>
+      _firebaseMethods.addMessageToDb(message, sender, receiver);
 }

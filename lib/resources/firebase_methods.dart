@@ -1,3 +1,4 @@
+import 'package:Chat_App/models/message.dart';
 import 'package:Chat_App/models/users.dart';
 import 'package:Chat_App/utils/utilities.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -70,5 +71,22 @@ class FirebaseMethods {
       }
     }
     return userList;
+  }
+
+  Future<void> addMessageToDb(
+      Message message, Users sender, Users receiver) async {
+    var map = message.toMap();
+
+    await _firestore
+        .collection("messages")
+        .doc(message.senderId)
+        .collection(message.receiverId)
+        .add(map);
+
+    return await _firestore
+        .collection("messages")
+        .doc(message.receiverId)
+        .collection(message.senderId)
+        .add(map);
   }
 }
