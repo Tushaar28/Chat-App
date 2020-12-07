@@ -1,15 +1,24 @@
-import 'dart:convert';
+import 'dart:io';
 
 import 'package:Chat_App/constants/strings.dart';
 import 'package:Chat_App/models/message.dart';
 import 'package:Chat_App/resources/firebase_repository.dart';
+import 'package:Chat_App/screens/widgets/Cached_Image.dart';
+import 'package:Chat_App/utils/call_utilities.dart';
+import 'package:Chat_App/utils/permissions.dart';
+import 'package:Chat_App/utils/utilities.dart';
 import 'package:Chat_App/widgets/custom_tile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:emoji_picker/emoji_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../models/users.dart';
 import '../utils/universal_variables.dart';
 import '../widgets/appbar.dart';
+import '../provider/ImageUploadProvider.dart';
+import '../enum/ViewState.dart';
 
 class ChatScreen extends StatefulWidget {
   final Users receiver;
@@ -21,8 +30,16 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   FirebaseRepository _repository = FirebaseRepository();
+
   TextEditingController textFieldController = TextEditingController();
+  ScrollController _listScrollController = ScrollController();
+  FocusNode textFieldFocus = FocusNode();
+
+  ImageUploadProvider _imageUploadProvider;
+
   bool isWriting = false;
+  bool showEmojiPicker = false;
+
   Users sender;
   String _currentUserId;
 
@@ -41,8 +58,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  showKeyboard() => textFieldFocus.requestFocus();
+
+  hideKeyboard() => textFieldFocus.unfocus();
+
+  hideEmojiContainer() {
+    setState(() {
+      showEmojiPicker = false;
+    });
+  }
+
+  showEmojiContainer() {
+    setState(() {
+      showEmojiPicker = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _imageUploadProvider = Provider.of<ImageUploadProvider>(context);
+
     return Scaffold(
       backgroundColor: UniversalVariables.blackColor,
       appBar: customAppBar(context),
@@ -51,9 +86,38 @@ class _ChatScreenState extends State<ChatScreen> {
           Flexible(
             child: messageList(),
           ),
+          _imageUploadProvider.getViewState == ViewState.LOADING
+              ? Container(
+                  alignment: Alignment.centerRight,
+                  margin: EdgeInsets.only(
+                    right: 15,
+                  ),
+                  child: CircularProgressIndicator(),
+                )
+              : Container(),
           chatControls(),
+          showEmojiPicker
+              ? Container(
+                  child: emojiContainer(),
+                )
+              : Container()
         ],
       ),
+    );
+  }
+
+  emojiContainer() {
+    return EmojiPicker(
+      bgColor: UniversalVariables.separatorColor,
+      indicatorColor: UniversalVariables.blueColor,
+      rows: 3,
+      columns: 7,
+      onEmojiSelected: (emoji, category) {
+        setState(() {
+          isWriting = true;
+        });
+        textFieldController.text = textFieldController.text + emoji.emoji;
+      },
     );
   }
 
@@ -71,9 +135,22 @@ class _ChatScreenState extends State<ChatScreen> {
             child: CircularProgressIndicator(),
           );
         }
+
+        // Moves the screen to end of screen when new message arrives
+        // SchedulerBinding.instance.addPostFrameCallback((_) {
+        //   _listScrollController.animateTo(
+        //     _listScrollController
+        //         .position.minScrollExtent, // Move to End of List
+        //     duration: Duration(milliseconds: 250),
+        //     curve: Curves.easeInOut,
+        //   );
+        // });
+
         return ListView.builder(
           padding: EdgeInsets.all(10),
           itemCount: snapshot.data.docs.length,
+          reverse: true,
+          controller: _listScrollController,
           itemBuilder: (context, index) {
             return chatMessageItem(snapshot.data.docs[index]);
           },
@@ -125,12 +202,31 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   getMessage(Message _message) {
-    return Text(
-      _message.message,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 16,
-      ),
+    return _message.type != MESSAGE_TYPE_IMAGE
+        ? Text(
+            _message.message,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+            ),
+          )
+        : _message.photoUrl != null
+            ? CachedImage(
+                _message.photoUrl,
+                height: 250,
+                width: 250,
+                radius: 10,
+              )
+            : Text("URL was null");
+  }
+
+  pickImage({@required ImageSource source}) async {
+    File selectedImage = await Utils.pickImage(source: source);
+    _repository.uploadImage(
+      image: selectedImage,
+      receiverId: widget.receiver.uid,
+      senderId: _currentUserId,
+      imageUploadProvider: _imageUploadProvider,
     );
   }
 
@@ -209,6 +305,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       title: "Media",
                       subtitle: "Share photos and videos",
                       icon: Icons.image,
+                      onTap: () => pickImage(source: ImageSource.gallery),
                     ),
                     ModalTile(
                       title: "File",
@@ -265,40 +362,58 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 5,
           ),
           Expanded(
-            child: TextField(
-              controller: textFieldController,
-              style: TextStyle(
-                color: Colors.white,
-              ),
-              onChanged: (val) {
-                (val.length > 0 && val.trim() != "")
-                    ? setWritingTo(true)
-                    : setWritingTo(false);
-              },
-              decoration: InputDecoration(
-                hintText: "Type message",
-                hintStyle: TextStyle(
-                  color: UniversalVariables.greyColor,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: const BorderRadius.all(
-                    const Radius.circular(50),
+            child: Stack(
+              children: [
+                TextField(
+                  controller: textFieldController,
+                  focusNode: textFieldFocus,
+                  onTap: () => hideEmojiContainer(),
+                  style: TextStyle(
+                    color: Colors.white,
                   ),
-                  borderSide: BorderSide.none,
+                  onChanged: (val) {
+                    (val.length > 0 && val.trim() != "")
+                        ? setWritingTo(true)
+                        : setWritingTo(false);
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Type message",
+                    hintStyle: TextStyle(
+                      color: UniversalVariables.greyColor,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: const BorderRadius.all(
+                        const Radius.circular(50),
+                      ),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 5,
+                    ),
+                    filled: true,
+                    fillColor: UniversalVariables.separatorColor,
+                  ),
                 ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 5,
-                ),
-                filled: true,
-                fillColor: UniversalVariables.separatorColor,
-                suffixIcon: GestureDetector(
-                  onTap: () {},
-                  child: Icon(
+                IconButton(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  onPressed: () {
+                    if (!showEmojiPicker) {
+                      // Keyboard is visible
+                      hideKeyboard();
+                      showEmojiContainer();
+                    } else {
+                      // Keyboard is hidden
+                      showKeyboard();
+                      hideEmojiContainer();
+                    }
+                  },
+                  icon: Icon(
                     Icons.face,
                   ),
                 ),
-              ),
+              ],
             ),
           ),
           isWriting
@@ -313,8 +428,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
           isWriting
               ? Container()
-              : Icon(
-                  Icons.camera_alt,
+              : GestureDetector(
+                  onTap: () => pickImage(source: ImageSource.camera),
+                  child: Icon(
+                    Icons.camera_alt,
+                  ),
                 ),
           isWriting
               ? Container(
@@ -373,7 +491,14 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: Icon(
             Icons.video_call,
           ),
-          onPressed: () {},
+          onPressed: () async =>
+              await Permissions.cameraAndMicrophonePermissionsGranted()
+                  ? CallUtils.dial(
+                      from: sender,
+                      to: widget.receiver,
+                      context: context,
+                    )
+                  : {},
         ),
         IconButton(
           icon: Icon(
@@ -390,11 +515,13 @@ class ModalTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final Function onTap;
 
   const ModalTile({
     @required this.icon,
     @required this.subtitle,
     @required this.title,
+    this.onTap,
   });
 
   @override
@@ -405,6 +532,7 @@ class ModalTile extends StatelessWidget {
       ),
       child: CustomTile(
         mini: false,
+        onTap: onTap,
         leading: Container(
           margin: EdgeInsets.only(
             right: 10,

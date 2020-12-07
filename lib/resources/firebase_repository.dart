@@ -1,12 +1,17 @@
 import 'package:Chat_App/models/message.dart';
 import 'package:Chat_App/models/users.dart';
+import 'package:Chat_App/provider/ImageUploadProvider.dart';
 import 'package:Chat_App/resources/firebase_methods.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
 
 class FirebaseRepository {
   FirebaseMethods _firebaseMethods = FirebaseMethods();
 
   Future<User> getCurrentUser() => _firebaseMethods.getCurrentUser();
+
+  Future<Users> getUserDetails() => _firebaseMethods.getUserDetails();
 
   Future<User> signIn() => _firebaseMethods.signIn();
 
@@ -22,4 +27,13 @@ class FirebaseRepository {
 
   Future<void> addMessageToDb(Message message, Users sender, Users receiver) =>
       _firebaseMethods.addMessageToDb(message, sender, receiver);
+
+  void uploadImage({
+    @required File image,
+    @required String receiverId,
+    @required String senderId,
+    @required ImageUploadProvider imageUploadProvider,
+  }) =>
+      _firebaseMethods.uploadImage(
+          image, receiverId, senderId, imageUploadProvider);
 }
